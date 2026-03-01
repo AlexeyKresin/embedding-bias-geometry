@@ -4,6 +4,7 @@ Geometric analysis of bias and semantic distortion in word embeddings.
 
 ## Goals
 - SPIRE (Hood College): early framework + pilot evidence
+- arxiv Publication
 - AAAI 2027: geometry-first evaluation + bias–utility trade-off analysis
 
 ## Repo structure
