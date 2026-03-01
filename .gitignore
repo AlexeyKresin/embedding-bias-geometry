@@ -228,3 +228,19 @@ glove*.txt
 # OS/editor
 .DS_Store
 Thumbs.db
+
+
+# Research: do not track large embeddings or local env
+research_env/
+glove*.txt
+*.vec
+*.bin
+*.npy
+outputs/
+
+
+# Research artifacts (do not commit)
+research_env/
+glove*.txt
+*.npy
+outputs/
