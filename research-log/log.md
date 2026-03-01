@@ -67,3 +67,19 @@ Cumulative variance:
 
 ### 2026-03-01 — PCA variance ratios Cumulative top -5 = 0.724
 
+### 2026-03-01 — k-PC removal sweep
+
+We removed the top k principal components of the gender subspace (k = 0,1,2,3,5,8,10) and measured:
+- direct bias
+- mean displacement
+- neighbor stability@10
+
+Key observation:
+Direct bias drops to 0 after removing only the first principal component (k=1).  
+However, both displacement and neighbor stability continue to change monotonically as k increases.
+
+Interpretation:
+The standard direct bias metric becomes insensitive to remaining gender-related structure after removal of the first component. Additional components affect semantic structure without affecting the bias metric.
+
+This suggests that fairness metrics based on a single gender direction underestimate residual structured bias.
+
