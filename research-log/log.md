@@ -37,6 +37,16 @@ Cumulative variance:
 - PC1–3: ~55%
 - PC1–5: ~72%
 
+**Reproducibility details**
+
+- Script: src/compute_gender_direction.py
+- Python environment: research_env (Python 3.12, gensim 4.3.2, sklearn 1.3.2)
+- Embedding file: glove.6B.300d.txt
+- Output artifact: gender_direction.npy (saved in project root)
+- Number of definitional pairs found in vocabulary: (leave blank for now)
+
+
+
 **Interpretation (preliminary)**
 - Gender-related structure is not concentrated in a single principal component.
 - Multiple components beyond PC1 contribute substantial variance.
@@ -54,4 +64,6 @@ Cumulative variance:
 - Perform k-PC removal (k = 1, 2, 3, 5, 8, 10).
 - Measure bias reduction (direct bias / WEAT) versus semantic impact (Destructiveness Index).
 - Plot bias–destructiveness trade-off curves.
+
+### 2026-03-01 — PCA variance ratios Cumulative top -5 = 0.724
 
