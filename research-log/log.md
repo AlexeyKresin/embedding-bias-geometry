@@ -20,3 +20,38 @@ H4: There is a measurable bias–destructiveness trade-off frontier
 
 \- Next: freeze wordlists (P, N) and implement baseline runner.
 
+
+### 2026-03-01 — Gender subspace PCA (GloVe 6B 300d)
+
+**Setup**
+- Embedding: GloVe 6B, 300d
+- Definitional pairs: `wordlists/definitional_pairs.txt`
+- Method: PCA on difference vectors (w₁ − w₂)
+
+**Results**
+Explained variance ratios (top 10 PCs):
+[0.2998, 0.1467, 0.1071, 0.0943, 0.0764, 0.0544, 0.0373, 0.0369, 0.0327, 0.0252]
+
+Cumulative variance:
+- PC1: 29.98%
+- PC1–3: ~55%
+- PC1–5: ~72%
+
+**Interpretation (preliminary)**
+- Gender-related structure is not concentrated in a single principal component.
+- Multiple components beyond PC1 contribute substantial variance.
+- This challenges the assumption that a single “gender direction” fully captures bias under this setup.
+
+**Claims we can safely make**
+- The gender subspace estimated from definitional pairs is multi-component in GloVe 300d.
+- Removing only PC1 is likely insufficient to eliminate all gender-correlated structure.
+
+**Claims we avoid for now**
+- Generalization to all embeddings or all wordlists.
+- Claims about downstream task performance or fairness improvements.
+
+**Next decisive experiment**
+- Perform k-PC removal (k = 1, 2, 3, 5, 8, 10).
+- Measure bias reduction (direct bias / WEAT) versus semantic impact (Destructiveness Index).
+- Plot bias–destructiveness trade-off curves.
+
