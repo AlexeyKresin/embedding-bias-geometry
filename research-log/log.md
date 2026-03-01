@@ -83,3 +83,15 @@ The standard direct bias metric becomes insensitive to remaining gender-related 
 
 This suggests that fairness metrics based on a single gender direction underestimate residual structured bias.
 
+### Plots Analysis at \figures
+Observation:
+Direct bias becomes zero after removing only the first principal component.
+
+However, semantic displacement and neighbor instability continue to increase as additional components are removed.
+
+Conclusion:
+The direct bias metric detects only the primary gender direction (PC1). Higher-order gender components still influence semantic geometry but are not captured by the metric.
+
+Implication:
+Current fairness evaluation may certify embeddings as unbiased while meaningful representational changes continue to occur.
+
