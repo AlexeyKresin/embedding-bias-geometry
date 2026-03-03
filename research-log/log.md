@@ -95,3 +95,17 @@ The direct bias metric detects only the primary gender direction (PC1). Higher-o
 Implication:
 Current fairness evaluation may certify embeddings as unbiased while meaningful representational changes continue to occur.
 
+### Experiment: WEAT under gender PC removal
+
+Embedding: GloVe 6B 300d
+Gender subspace estimated via PCA on definitional pairs.
+
+Results:
+Direct bias drops to ~0 after removing the first principal component (PC1).
+However, WEAT effect size remains high (~1.7) after PC1 removal and decreases only gradually as additional PCs are removed.
+
+Interpretation:
+Projection-based bias metrics detect only the dominant gender direction, while association-based bias persists even after removing that direction.
+ This suggests that fairness metrics capture different aspects of gender structure in embeddings.
+
+
