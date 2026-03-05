@@ -70,9 +70,9 @@ Cumulative variance:
 ### 2026-03-01 — k-PC removal sweep
 
 We removed the top k principal components of the gender subspace (k = 0,1,2,3,5,8,10) and measured:
-- direct bias
-- mean displacement
-- neighbor stability@10
+- direct bias  - Measures the projection of gender-neutral words onto the gender direction, High value stronger gender projection.
+- mean displacement - Measures how much the embedding vectors move after debiasing
+- neighbor stability@10 - Measures how much the semantic neighborhood of each word changes after debiasing. (10 neighbors)
 
 Key observation:
 Direct bias drops to 0 after removing only the first principal component (k=1).  
