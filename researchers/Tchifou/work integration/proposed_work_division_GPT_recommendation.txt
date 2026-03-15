@@ -1,0 +1,83 @@
+# 5. Perfect division of work
+
+### You (mathematical analysis)
+
+Focus on:
+
+* geometry of bias subspace
+* why PC1 controls Direct Bias
+* why WEAT responds to PC2+
+
+Possible analysis:
+
+```
+projection distribution of words onto PCs
+bias subspace dimensionality
+metric sensitivity to PC directions
+```
+
+---
+
+### Your peer (empirical validation)
+
+Tasks:
+
+1. reproduce GloVe results
+2. run pipeline on
+
+```
+FastText
+Word2Vec
+```
+
+3. produce comparison plots
+
+Example table:
+
+| Embedding | PC1 removes Direct Bias | WEAT drop gradual | Geometry shift |
+| --------- | ----------------------- | ----------------- | -------------- |
+| GloVe     | ✓                       | ✓                 | ✓              |
+| FastText  | ?                       | ?                 | ?              |
+| Word2Vec  | ?                       | ?                 | ?              |
+
+If results hold → **strong paper claim**.
+
+---
+
+# 6. One experiment I strongly recommend adding
+
+Ask him to run **PC sweep up to 20**.
+
+Instead of:
+
+```
+k = [0,1,2,3,5,8,10]
+```
+
+test:
+
+```
+k = 0..20
+```
+
+That will show the **full bias subspace structure**.
+
+---
+
+# 7. Your project is already unusually strong
+
+You currently have **four types of analysis**:
+
+1. PC removal sweep
+2. single-PC ablation
+3. WEAT sweep
+4. bias spectrum analysis
+
+Many embedding papers have **less experimental depth than this**.
+
+You’re already in **arXiv territory** if the results replicate.
+---
+
+If you want, I can also show you **the single most convincing figure you can add to the paper**.
+
+It’s a **2D plot that almost immediately proves the subspace hypothesis** and reviewers love it.
