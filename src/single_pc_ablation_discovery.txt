@@ -1,0 +1,531 @@
+Single-PC ablation discovery report
+========================================
+
+Project root: C:\Users\USER\embedding-bias-geometry\src
+
+
+[2d_bias_visualization.py]
+  L4: from sklearn.decomposition import PCA
+  L9: EMBEDDING_FILE = "../data/glove.6B.300d.txt"   # adjust if needed
+  L40: def load_glove_subset(path, target_words):
+  L42: embeddings = {}
+  L48: embeddings[word] = np.asarray(parts[1:], dtype=np.float32)
+  L49: return embeddings
+  L89: print("Loading embeddings...")
+  L90: embeddings = load_glove_subset(EMBEDDING_FILE, WORDS)
+  L92: found_words = [w for w in WORDS if w in embeddings]
+  L93: missing_words = [w for w in WORDS if w not in embeddings]
+  L102: X = np.vstack([embeddings[w] for w in found_words])
+  L104: # PCA projection for visualization only
+  L105: pca = PCA(n_components=2)
+  L106: X_2d = pca.fit_transform(X)
+  L244: plt.title("Gender Bias in Word Embeddings", fontsize=20, pad=12)
+  L264: "2D PCA projection for visualization only",
+
+[analyze_bias_spectrum.py]
+  L5: from sklearn.decomposition import PCA
+  L11: EMBEDDING_FILE = "../data/glove.6B.300d.txt"   # adjust if needed
+  L15: # Definitional gender pairs
+  L16: DEFINITIONAL_PAIRS = [
+  L41: def load_glove_embeddings(path):
+  L42: embeddings = {}
+  L48: embeddings[word] = vec
+  L49: return embeddings
+  L63: print("Loading embeddings...")
+  L64: embeddings = load_glove_embeddings(EMBEDDING_FILE)
+  L65: print(f"Loaded {len(embeddings)} embeddings.")
+  L67: # Keep only definitional pairs that exist in vocab
+  L71: for a, b in DEFINITIONAL_PAIRS:
+  L72: if a in embeddings and b in embeddings:
+  L73: diff = embeddings[a] - embeddings[b]
+  L80: raise ValueError("Not enough valid definitional pairs found for PCA.")
+  L84: # PCA on definitional pair differences
+  L85: pca = PCA()
+  L86: pca.fit(X)
+  L88: components = pca.components_                     # shape: [num_pcs, dim]
+  L89: explained = pca.explained_variance_ratio_       # shape: [num_pcs]
+  L92: # Mean absolute projection of definitional differences onto each PC
+  L99: valid_neutral_words = [w for w in NEUTRAL_WORDS if w in embeddings]
+  L101: raise ValueError("No neutral words found in embeddings.")
+  L105: vals = [abs(np.dot(embeddings[w], pc)) for w in valid_neutral_words]
+  L135: axs[1].set_title("Alignment of Definitional Pair Differences with Each PC")
+  L140: axs[2].set_xlabel("Principal component index")
+
+[compute_gender_direction.py]
+  L2: from sklearn.decomposition import PCA
+  L5: EMBEDDING_PATH = "glove.6B.300d.txt"   # we will download next
+  L15: print("Loading embeddings (this will be slow first time)...")
+  L16: model = KeyedVectors.load_word2vec_format(EMBEDDING_PATH, binary=False, no_header=True)
+  L18: pairs = load_word_pairs("wordlists/definitional_pairs.txt")
+  L30: print("Running PCA...")
+  L31: pca = PCA(n_components=10)
+  L32: pca.fit(diff_vectors)
+  L34: gender_direction = pca.components_[0]
+  L37: print(pca.explained_variance_ratio_)
+
+[pc_removal_bias_only.py]
+  L2: from sklearn.decomposition import PCA
+  L6: EMBEDDING_PATH = "glove.6B.300d.txt"
+  L7: PAIRS_PATH = "wordlists/definitional_pairs.txt"
+  L45: pca = PCA(n_components=min(n_components, diffs.shape[0]))
+  L46: pca.fit(diffs)
+  L47: return pca.components_, pca.explained_variance_ratio_
+  L56: def direct_bias(model, neutral_words, g_dir, pcs, k):
+  L68: print("Loading embeddings...")
+  L69: model = KeyedVectors.load_word2vec_format(EMBEDDING_PATH, binary=False, no_header=True)
+  L79: db = direct_bias(model, neutral, g_dir, pcs, k)
+  L80: print(f"k={k} direct_bias={db:.6f}")
+
+[pc_removal_sweep.py]
+  L3: from sklearn.decomposition import PCA
+  L7: EMBEDDING_PATH = "glove.6B.300d.txt"
+  L8: PAIRS_PATH = "wordlists/definitional_pairs.txt"
+  L55: raise ValueError("Not enough definitional pairs found in vocab.")
+  L56: pca = PCA(n_components=min(n_components, diffs.shape[0]))
+  L57: pca.fit(diffs)
+  L58: return pca.components_, pca.explained_variance_ratio_, kept
+  L67: def direct_bias(model, neutral_words, g_dir, pcs, k):
+  L78: def mean_displacement(model, neutral_words, pcs, k):
+  L132: print("Loading embeddings...")
+  L133: model = KeyedVectors.load_word2vec_format(EMBEDDING_PATH, binary=False, no_header=True)
+  L142: print(f"Definitional pairs used: {len(kept)}/{len(pairs)}")
+  L144: print(f"Building candidate vocab matrix (top {CANDIDATE_VOCAB} words) for neighbor stability...")
+  L153: db = direct_bias(model, neutral, g_dir, pcs, k)
+  L154: disp = mean_displacement(model, neutral, pcs, k)
+  L156: print(f"direct_bias={db:.6f}  mean_displacement={disp:.6f}  nn_stability@{TOP_N}={stab:.4f}")
+  L160: f.write("k,direct_bias,mean_displacement,nn_stability_at10\n")
+
+[plot_combined_4graphs.py]
+  L6: weat_file = "../outputs/weat_pc_sweep_results.csv"
+  L10: weat = pd.read_csv(weat_file)
+  L23: # 1. Direct Bias
+  L24: axs[0].plot(pc["k"], pc["direct_bias"], marker="o", linewidth=2.2, markersize=8)
+  L25: axs[0].set_ylabel("Direct Bias")
+  L26: axs[0].set_title("Direct Bias vs Removed Gender Components")
+  L29: # 2. WEAT
+  L30: axs[1].plot(weat["k"], weat["weat_effect_size"], marker="o", linewidth=2.2, markersize=8)
+  L31: axs[1].set_ylabel("WEAT (Cohen's d)")
+  L32: axs[1].set_title("WEAT Association Bias vs Removed Components")
+  L35: # 3. Mean Displacement
+  L36: axs[2].plot(pc["k"], pc["mean_displacement"], marker="o", linewidth=2.2, markersize=8)
+  L37: axs[2].set_ylabel("Mean Displacement")
+  L38: axs[2].set_title("Mean Vector Displacement vs Removed Components")
+  L41: # 4. Neighbor Stability
+  L44: axs[3].set_xlabel("Number of gender principal components removed (k)")
+
+[plot_combined_results.py]
+  L5: weat_file = "outputs/weat_pc_sweep_results.csv"
+  L8: weat = pd.read_csv(weat_file)
+  L12: # Direct bias
+  L13: axs[0].plot(pc["k"], pc["direct_bias"], marker="o")
+  L14: axs[0].set_ylabel("Direct bias")
+  L18: # WEAT
+  L19: axs[1].plot(weat["k"], weat["weat_effect_size"], marker="o")
+  L20: axs[1].set_ylabel("WEAT (Cohen's d)")
+  L21: axs[1].set_title("Association bias vs k")
+  L24: # Neighbor stability
+  L26: axs[2].set_ylabel("Neighbor stability @10")
+
+[plot_combined_results_SPIRE.py]
+  L6: #weat_file = "outputs/weat_pc_sweep_results.csv"
+  L9: weat_file = "../outputs/weat_pc_sweep_results.csv"
+  L14: weat = pd.read_csv(weat_file)
+  L28: # 1. Direct Bias
+  L29: axs[0].plot(pc["k"], pc["direct_bias"], marker="o", linewidth=2.2, markersize=8)
+  L30: axs[0].set_ylabel("Direct Bias")
+  L31: axs[0].set_title("Direct Bias vs Removed Gender Components")
+  L34: # 2. WEAT
+  L35: axs[1].plot(weat["k"], weat["weat_effect_size"], marker="o", linewidth=2.2, markersize=8)
+  L36: axs[1].set_ylabel("WEAT (Cohen's d)")
+  L37: axs[1].set_title("WEAT Association Bias vs Removed Components")
+  L40: # 3. Neighbor Stability
+  L43: axs[2].set_xlabel("Number of gender principal components removed (k)")
+
+[plot_pc_sweep.py]
+  L16: "direct_bias": float(r["direct_bias"]),
+  L17: "mean_displacement": float(r["mean_displacement"]),
+  L25: bias = [r["direct_bias"] for r in rows]
+  L26: disp = [r["mean_displacement"] for r in rows]
+  L29: # Plot 1: Direct bias vs k
+  L33: plt.ylabel("Direct bias (mean |cos(w, g)|)")
+  L34: plt.title("Direct bias vs k (PC removal)")
+  L40: # Plot 2: Mean displacement vs k
+  L44: plt.ylabel("Mean displacement (1 - cos(w, w'))")
+  L45: plt.title("Semantic displacement vs k (PC removal)")
+  L47: p2 = os.path.join(OUT_DIR, "displacement_vs_k.png")
+  L51: # Plot 3: Neighbor stability vs k
+  L55: plt.ylabel("Neighbor stability@10 (mean overlap)")
+  L56: plt.title("Neighbor stability vs k (PC removal)")
+  L62: # Plot 4 (key): Bias vs displacement
+  L67: plt.xlabel("Mean displacement (1 - cos(w, w'))")
+  L68: plt.ylabel("Direct bias (mean |cos(w, g)|)")
+  L69: plt.title("Bias vs displacement (trade-off curve)")
+  L71: p4 = os.path.join(OUT_DIR, "bias_vs_displacement.png")
+
+[plot_weat_pc_sweep.py]
+  L5: CSV_PATH = os.path.join("outputs", "weat_pc_sweep_results.csv")
+  L10: weat = []
+  L16: weat.append(float(r["weat_effect_size"]))
+  L19: plt.plot(k, weat, marker="o")
+  L21: plt.ylabel("WEAT effect size (Cohen's d)")
+  L22: plt.title("WEAT under k-PC removal (GloVe 300d)")
+  L25: out = os.path.join(OUT_DIR, "weat_vs_k.png")
+
+[single_pc_ablation.py]
+  L4: from sklearn.decomposition import PCA
+  L12: EMBEDDING_FILE = "../data/glove.6B.300d.txt"
+  L18: WEAT_CAREER_FILE = os.path.join(WORDLIST_DIR, "weat_career.txt")
+  L19: WEAT_FAMILY_FILE = os.path.join(WORDLIST_DIR, "weat_family.txt")
+  L20: WEAT_MALE_FILE = os.path.join(WORDLIST_DIR, "weat_male.txt")
+  L21: WEAT_FEMALE_FILE = os.path.join(WORDLIST_DIR, "weat_female.txt")  # make sure this exists
+  L23: DEFINITIONAL_PAIRS = [
+  L49: def load_glove_embeddings(path):
+  L50: embeddings = {}
+  L56: embeddings[word] = vec
+  L57: return embeddings
+  L79: def build_gender_pca(embeddings, definitional_pairs):
+  L83: for a, b in definitional_pairs:
+  L84: if a in embeddings and b in embeddings:
+  L85: diffs.append(embeddings[a] - embeddings[b])
+  L88: print(f"Skipping missing definitional pair: ({a}, {b})")
+  L91: raise ValueError("Not enough valid definitional pairs found for PCA.")
+  L94: pca = PCA()
+  L95: pca.fit(X)
+  L97: return pca, valid_pairs, X
+  L100: def direct_bias(neutral_vectors, gender_direction):
+  L112: def weat_association(w, A, B):
+  L116: def weat_effect_size(X, Y, A, B):
+  L117: s_X = np.array([weat_association(x, A, B) for x in X])
+  L118: s_Y = np.array([weat_association(y, A, B) for y in Y])
+  L129: def mean_displacement(original_vectors, transformed_vectors):
+  L177: print("Loading embeddings...")
+  L178: embeddings = load_glove_embeddings(EMBEDDING_FILE)
+  L179: print(f"Loaded {len(embeddings)} embeddings.")
+  L183: X_words_raw = load_word_list(WEAT_CAREER_FILE)
+  L184: Y_words_raw = load_word_list(WEAT_FAMILY_FILE)
+  L185: A_words_raw = load_word_list(WEAT_MALE_FILE)
+  L186: B_words_raw = load_word_list(WEAT_FEMALE_FILE)
+  L188: # Filter all lists to words present in embeddings
+  L189: neutral_words = [w for w in neutral_words_raw if w in embeddings]
+  L190: X_words = [w for w in X_words_raw if w in embeddings]
+  L191: Y_words = [w for w in Y_words_raw if w in embeddings]
+  L192: A_words = [w for w in A_words_raw if w in embeddings]
+  L193: B_words = [w for w in B_words_raw if w in embeddings]
+  L196: print(f"WEAT career words in vocab: {len(X_words)} / {len(X_words_raw)}")
+  L197: print(f"WEAT family words in vocab: {len(Y_words)} / {len(Y_words_raw)}")
+  L198: print(f"WEAT male words in vocab: {len(A_words)} / {len(A_words_raw)}")
+  L199: print(f"WEAT female words in vocab: {len(B_words)} / {len(B_words_raw)}")
+  L202: raise ValueError("No neutral words found in embeddings.")
+  L204: raise ValueError("One or more WEAT sets are empty after vocabulary filtering.")
+  L206: # PCA on definitional pair differences
+  L207: pca, valid_pairs, diff_matrix = build_gender_pca(embeddings, DEFINITIONAL_PAIRS)
+  L208: components = pca.components_
+  L211: print(f"Valid definitional pairs used for PCA: {len(valid_pairs)}")
+  L214: # For consistency with your earlier Direct Bias setup:
+  L219: neutral_vecs_orig = [embeddings[w] for w in neutral_words]
+  L221: X_orig = np.vstack([embeddings[w] for w in X_words])
+  L222: Y_orig = np.vstack([embeddings[w] for w in Y_words])
+  L223: A_orig = np.vstack([embeddings[w] for w in A_words])
+  L224: B_orig = np.vstack([embeddings[w] for w in B_words])
+  L226: baseline_direct = direct_bias(neutral_vecs_orig, gender_direction)
+  L227: baseline_weat = weat_effect_size(X_orig, Y_orig, A_orig, B_orig)
+  L229: print(f"Baseline Direct Bias: {baseline_direct:.6f}")
+  L230: print(f"Baseline WEAT: {baseline_weat:.6f}")
+  L234: analysis_orig = {w: embeddings[w] for w in analysis_words}
+  L243: transformed[w] = project_off_pc(embeddings[w], pc)
+  L245: # Direct Bias
+  L247: direct_new = direct_bias(neutral_vecs_new, gender_direction)
+  L249: # WEAT
+  L254: weat_new = weat_effect_size(X_new, Y_new, A_new, B_new)
+  L260: disp = mean_displacement(orig_mat, new_mat)
+  L265: "direct_bias_after_removing_only_pc": direct_new,
+  L266: "delta_direct_bias": baseline_direct - direct_new,
+  L267: "weat_after_removing_only_pc": weat_new,
+  L268: "delta_weat": baseline_weat - weat_new,
+  L269: "mean_displacement": disp,
+  L277: f"WEAT={weat_new:.6f}, "
+  L278: f"ΔWEAT={baseline_weat - weat_new:.6f}, "
+
+[weat_pc_sweep.py]
+  L6: from sklearn.decomposition import PCA
+  L10: #   python src/weat_pc_sweep.py path/to/embedding.txt
+  L12: #   python src/weat_pc_sweep.py
+  L14: EMBEDDING_PATH = sys.argv[1] if len(sys.argv) > 1 else "glove.6B.300d.txt"
+  L16: PAIRS_PATH = "wordlists/definitional_pairs.txt"
+  L17: X_PATH = "wordlists/weat_male.txt"
+  L18: Y_PATH = "wordlists/weat_female.txt"
+  L19: A_PATH = "wordlists/weat_career.txt"
+  L20: B_PATH = "wordlists/weat_family.txt"
+  L63: raise ValueError("Not enough definitional pairs found in vocab.")
+  L64: pca = PCA(n_components=min(n_components, diffs.shape[0]))
+  L65: pca.fit(diffs)
+  L66: return pca.components_, pca.explained_variance_ratio_, kept
+  L75: def s_association(w_vec, A_vecs, B_vecs):
+  L81: def weat_effect_size(X_vecs, Y_vecs, A_vecs, B_vecs):
+  L83: sx = np.array([s_association(xv, A_vecs, B_vecs) for xv in X_vecs], dtype=np.float64)
+  L84: sy = np.array([s_association(yv, A_vecs, B_vecs) for yv in Y_vecs], dtype=np.float64)
+  L104: print("Loading embeddings:", EMBEDDING_PATH)
+  L105: model = KeyedVectors.load_word2vec_format(EMBEDDING_PATH, binary=False, no_header=True)
+  L109: print("Gender PCA EVR top 10:", evr[:10])
+  L110: print(f"Definitional pairs used: {len(kept_pairs)}/{len(pairs)}")
+  L118: out_csv = os.path.join("outputs", "weat_pc_sweep_results.csv")
+  L132: effect = weat_effect_size(X_vecs, Y_vecs, A_vecs, B_vecs)
+  L134: print(f"k={k} WEAT_effect_size={effect:.6f}  (kept: X={len(X_kept)}, Y={len(Y_kept)}, A={len(A_kept)}, B={len(B_kept)})")
+  L139: w.writerow(["k", "weat_effect_size", "X_kept", "Y_kept", "A_kept", "B_kept"])
+
+[math_experiments\single_pc_ablation.py]
+  L6: Single-PC ablation experiment for gender subspace analysis in static word embeddings.
+  L10: For each gender principal component g_i (default: PCs 1..10), it removes ONLY that
+  L11: component from the embedding matrix:
+  L16: - Direct Bias
+  L17: - WEAT
+  L18: - Mean displacement from the original embedding
+  L19: - Neighbor stability@10 relative to the original embedding
+  L36: - This script does NOT recompute PCA after each ablation.
+  L72: #   load_embedding() -> (vocab: list[str], X: np.ndarray[shape=(n_words, dim)])
+  L74: #   direct_bias(vocab, X, gender_direction, **kwargs) -> float
+  L75: #   weat(vocab, X, **kwargs) -> float
+  L78: #   LOAD_EMBEDDING_FN = "src.embedding_utils:load_glove_matrix"
+  L80: #   DIRECT_BIAS_FN = "src.metrics:compute_direct_bias"
+  L81: #   WEAT_FN = "src.metrics:compute_weat"
+  L83: # By default this script can read the raw GloVe text file directly.
+  L85: LOAD_EMBEDDING_FN: str | None = "__main__:load_glove_txt"
+  L87: DIRECT_BIAS_FN: str | None = None
+  L88: WEAT_FN: str | None = None
+  L92: #   - embedding .npz with keys: X, vocab
+  L94: EMBEDDING_NPZ: str | None = None
+  L97: # Raw GloVe fallback location, relative to repo root.
+  L98: GLOVE_TXT_RELATIVE: str = "data/glove.6B.300d.txt"
+  L100: # Optional fallback source for computing gender PCs directly from definitional pairs.
+  L104: DEFINITIONAL_PAIRS_JSON: str | None = None
+  L108: DIRECT_BIAS_WORDS_JSON: str | None = None
+  L109: WEAT_JSON: str | None = None
+  L134: class WeatSets:
+  L160: def load_glove_txt(path: str | Path | None = None) -> tuple[list[str], np.ndarray]:
+  L162: Load GloVe vectors from the raw text file.
+  L163: Default path: repo_root / data / glove.6B.300d.txt
+  L165: glove_path = resolve_path(path or GLOVE_TXT_RELATIVE)
+  L166: if not glove_path.exists():
+  L168: f"GloVe text file not found: {glove_path}\n"
+  L169: "Update GLOVE_TXT_RELATIVE or LOAD_EMBEDDING_FN in the config section."
+  L174: with open(glove_path, "r", encoding="utf-8") as f:
+  L190: raise RuntimeError(f"No vectors were loaded from: {glove_path}")
+  L220: raise ValueError(f"PC shape {pcs.shape} is incompatible with embedding dim {emb_dim}")
+  L237: """Remove only one principal component g from every row of X."""
+  L242: def mean_displacement(X0: np.ndarray, X1: np.ndarray) -> float:
+  L294: def direct_bias_standalone(
+  L302: Simple direct bias: mean(|cos(w, g)|^c) over target words.
+  L308: raise ValueError("No target words found for Direct Bias calculation")
+  L316: def association(w: np.ndarray, A: np.ndarray, B: np.ndarray) -> float:
+  L323: def weat_effect_size_standalone(vocab: Sequence[str], X: np.ndarray, sets: WeatSets) -> float:
+  L324: """Caliskan-style WEAT effect size."""
+  L338: s_X = np.array([association(w, A_words, B_words) for w in X_words], dtype=np.float64)
+  L339: s_Y = np.array([association(w, A_words, B_words) for w in Y_words], dtype=np.float64)
+  L349: def load_embedding_from_npz(path: str | Path) -> tuple[list[str], np.ndarray]:
+  L352: raise KeyError(f"Embedding NPZ must contain keys 'X' and 'vocab': {path}")
+  L376: def build_assets(definitional_pairs_json: str | None = None) -> ExperimentAssets:
+  L377: load_embedding = resolve_callable(LOAD_EMBEDDING_FN)
+  L380: if load_embedding is not None:
+  L381: vocab, X = load_embedding()
+  L382: elif EMBEDDING_NPZ:
+  L383: vocab, X = load_embedding_from_npz(resolve_path(EMBEDDING_NPZ))
+  L386: "No embedding source configured. Set LOAD_EMBEDDING_FN or EMBEDDING_NPZ."
+  L391: raise ValueError(f"Embedding matrix must be 2D, got shape {X.shape}")
+  L398: pairs_path = definitional_pairs_json or DEFINITIONAL_PAIRS_JSON
+  L402: "or provide --definitional-pairs-json."
+  L404: pairs = load_definitional_pairs(resolve_path(pairs_path))
+  L405: pcs = compute_gender_pcs_from_definitional_pairs(vocab, X, pairs)
+  L409: raise ValueError(f"Embedding matrix must be 2D, got shape {X.shape}")
+  L423: def load_definitional_pairs(path: str | Path) -> list[tuple[str, str]]:
+  L431: "Definitional pairs JSON must be either a list of pairs or {'pairs': [...]}."
+  L437: raise ValueError(f"Invalid definitional pair entry: {item}")
+  L441: raise ValueError("No definitional pairs found")
+  L445: def compute_gender_pcs_from_definitional_pairs(
+  L451: Compute gender PCs once from definitional pair difference vectors using SVD.
+  L464: "None of the definitional pairs were found in the embedding vocabulary."
+  L474: f"Warning: skipped {len(missing)} definitional pairs not found in vocab.",
+  L488: "glove", "embedding", "load_embedding", "word2vec",
+  L489: "pca", "principal component", "gender subspace", "definitional",
+  L490: "direct bias", "direct_bias",
+  L491: "weat", "association",
+  L492: "neighbor stability", "neighbour stability", "stability@10",
+  L493: "displacement",
+  L532: def load_direct_bias_words(cli_path: str | None) -> list[str]:
+  L533: path = cli_path or DIRECT_BIAS_WORDS_JSON
+  L536: "No Direct Bias word list provided. Pass --direct-bias-words-json or set DIRECT_BIAS_WORDS_JSON."
+  L543: raise ValueError("Direct Bias JSON must be either a list or {'words': [...]}.")
+  L546: def load_weat_sets(cli_path: str | None) -> WeatSets:
+  L547: path = cli_path or WEAT_JSON
+  L550: "No WEAT set file provided. Pass --weat-json or set WEAT_JSON."
+  L556: raise ValueError(f"WEAT JSON missing keys: {missing}")
+  L557: return WeatSets(
+  L568: def compute_direct_bias(
+  L574: project_fn = resolve_callable(DIRECT_BIAS_FN)
+  L588: return direct_bias_standalone(vocab, X, gender_direction, target_words)
+  L591: def compute_weat(vocab: list[str], X: np.ndarray, weat_sets: WeatSets) -> float:
+  L592: project_fn = resolve_callable(WEAT_FN)
+  L598: kwargs[name] = weat_sets.X
+  L602: kwargs[name] = weat_sets.Y
+  L606: kwargs[name] = weat_sets.A
+  L610: kwargs[name] = weat_sets.B
+  L614: return weat_effect_size_standalone(vocab, X, weat_sets)
+  L625: axes[0].plot(df["pc"], df["direct_bias"], marker="o", label="Direct Bias")
+  L626: axes[0].plot(df["pc"], df["weat"], marker="o", label="WEAT")
+  L632: axes[1].plot(df["pc"], df["mean_displacement"], marker="o", label="Mean displacement")
+  L633: axes[1].plot(df["pc"], df["neighbor_stability_at_10"], marker="o", label="Neighbor stability@10")
+  L645: ax.plot(df["pc"], df["delta_direct_bias"], marker="o", label="Δ Direct Bias")
+  L646: ax.plot(df["pc"], df["delta_weat"], marker="o", label="Δ WEAT")
+  L647: ax.plot(df["pc"], df["delta_mean_displacement"], marker="o", label="Δ Mean displacement")
+  L648: ax.plot(df["pc"], df["delta_neighbor_stability"], marker="o", label="Δ Neighbor stability")
+  L652: ax.set_title("Single-PC ablation deltas relative to original embedding")
+  L668: direct_bias_words_json: str | None,
+  L669: weat_json: str | None,
+  L670: definitional_pairs_json: str | None,
+  L675: assets = build_assets(definitional_pairs_json)
+  L681: direct_bias_words = load_direct_bias_words(direct_bias_words_json)
+  L682: weat_sets = load_weat_sets(weat_json)
+  L684: # Baseline metrics on original embedding.
+  L686: baseline_direct_bias = compute_direct_bias(vocab, X0, baseline_gender_direction, direct_bias_words)
+  L687: baseline_weat = compute_weat(vocab, X0, weat_sets)
+  L688: baseline_mean_displacement = 0.0
+  L696: direct_bias = compute_direct_bias(vocab, Xp, baseline_gender_direction, direct_bias_words)
+  L697: weat = compute_weat(vocab, Xp, weat_sets)
+  L698: disp = mean_displacement(X0, Xp)
+  L710: "direct_bias": direct_bias,
+  L711: "weat": weat,
+  L712: "mean_displacement": disp,
+  L714: "delta_direct_bias": direct_bias - baseline_direct_bias,
+  L715: "delta_weat": weat - baseline_weat,
+  L716: "delta_mean_displacement": disp - baseline_mean_displacement,
+  L721: f"PC{pc:02d} | direct_bias={direct_bias:.6f} | weat={weat:.6f} | "
+  L722: f"mean_disp={disp:.6f} | neighbor_stability@10={stab:.6f}"
+  L729: print("\nBaseline metrics on original embedding")
+  L730: print(f"  direct_bias:            {baseline_direct_bias:.6f}")
+  L731: print(f"  weat:                   {baseline_weat:.6f}")
+  L732: print(f"  mean_displacement:      {baseline_mean_displacement:.6f}")
+  L733: print(f"  neighbor_stability@10:  {baseline_neighbor_stability:.6f}")
+  L736: best_db = df.loc[df["delta_direct_bias"].idxmin()]
+  L737: best_weat = df.loc[df["delta_weat"].idxmin()]
+  L738: biggest_shift = df.loc[df["mean_displacement"].idxmax()]
+  L741: print(f"  Biggest Direct Bias reduction: PC{int(best_db['pc'])} (Δ={best_db['delta_direct_bias']:.6f})")
+  L742: print(f"  Biggest WEAT reduction:        PC{int(best_weat['pc'])} (Δ={best_weat['delta_weat']:.6f})")
+  L743: print(f"  Biggest geometry shift:        PC{int(biggest_shift['pc'])} (mean displacement={biggest_shift['mean_displacement']:.6f})")
+  L752: parser = argparse.ArgumentParser(description="Run single-PC ablation on gender subspace PCs.")
+  L763: parser.add_argument("--weat-json", type=str, default=None)
+  L765: "--definitional-pairs-json",
+  L768: help="JSON file with definitional gender pairs. Used only if no gender PC loader/file is configured.",
+  L793: direct_bias_words_json=args.direct_bias_words_json,
+  L794: weat_json=args.weat_json,
+  L795: definitional_pairs_json=args.definitional_pairs_json,
+
+[math_experiments\single_pc_ablation_prev.py]
+  L6: Single-PC ablation experiment for gender subspace analysis in static word embeddings.
+  L10: For each gender principal component g_i (default: PCs 1..10), it removes ONLY that
+  L11: component from the embedding matrix:
+  L16: - Direct Bias
+  L17: - WEAT
+  L18: - Mean displacement from the original embedding
+  L19: - Neighbor stability@10 relative to the original embedding
+  L36: - This script does NOT recompute PCA after each ablation.
+  L72: #   load_embedding() -> (vocab: list[str], X: np.ndarray[shape=(n_words, dim)])
+  L74: #   direct_bias(vocab, X, gender_direction, **kwargs) -> float
+  L75: #   weat(vocab, X, **kwargs) -> float
+  L78: #   LOAD_EMBEDDING_FN = "src.embedding_utils:load_glove_matrix"
+  L80: #   DIRECT_BIAS_FN = "src.metrics:compute_direct_bias"
+  L81: #   WEAT_FN = "src.metrics:compute_weat"
+  L83: LOAD_EMBEDDING_FN: str | None = None
+  L85: DIRECT_BIAS_FN: str | None = None
+  L86: WEAT_FN: str | None = None
+  L90: #   - embedding .npz with keys: X, vocab
+  L92: EMBEDDING_NPZ: str | None = None
+  L97: DIRECT_BIAS_WORDS_JSON: str | None = None
+  L98: WEAT_JSON: str | None = None
+  L123: class WeatSets:
+  L159: raise ValueError(f"PC shape {pcs.shape} is incompatible with embedding dim {emb_dim}")
+  L176: """Remove only one principal component g from every row of X."""
+  L181: def mean_displacement(X0: np.ndarray, X1: np.ndarray) -> float:
+  L233: def direct_bias_standalone(
+  L241: Simple direct bias: mean(|cos(w, g)|^c) over target words.
+  L247: raise ValueError("No target words found for Direct Bias calculation")
+  L255: def association(w: np.ndarray, A: np.ndarray, B: np.ndarray) -> float:
+  L262: def weat_effect_size_standalone(vocab: Sequence[str], X: np.ndarray, sets: WeatSets) -> float:
+  L263: """Caliskan-style WEAT effect size."""
+  L277: s_X = np.array([association(w, A_words, B_words) for w in X_words], dtype=np.float64)
+  L278: s_Y = np.array([association(w, A_words, B_words) for w in Y_words], dtype=np.float64)
+  L288: def load_embedding_from_npz(path: str | Path) -> tuple[list[str], np.ndarray]:
+  L291: raise KeyError(f"Embedding NPZ must contain keys 'X' and 'vocab': {path}")
+  L316: load_embedding = resolve_callable(LOAD_EMBEDDING_FN)
+  L319: if load_embedding is not None:
+  L320: vocab, X = load_embedding()
+  L321: elif EMBEDDING_NPZ:
+  L322: vocab, X = load_embedding_from_npz(EMBEDDING_NPZ)
+  L325: "No embedding source configured. Set LOAD_EMBEDDING_FN or EMBEDDING_NPZ."
+  L339: raise ValueError(f"Embedding matrix must be 2D, got shape {X.shape}")
+  L361: "glove", "embedding", "load_embedding", "word2vec",
+  L362: "pca", "principal component", "gender subspace", "definitional",
+  L363: "direct bias", "direct_bias",
+  L364: "weat", "association",
+  L365: "neighbor stability", "neighbour stability", "stability@10",
+  L366: "displacement",
+  L405: def load_direct_bias_words(cli_path: str | None) -> list[str]:
+  L406: path = cli_path or DIRECT_BIAS_WORDS_JSON
+  L409: "No Direct Bias word list provided. Pass --direct-bias-words-json or set DIRECT_BIAS_WORDS_JSON."
+  L416: raise ValueError("Direct Bias JSON must be either a list or {'words': [...]}.")
+  L419: def load_weat_sets(cli_path: str | None) -> WeatSets:
+  L420: path = cli_path or WEAT_JSON
+  L423: "No WEAT set file provided. Pass --weat-json or set WEAT_JSON."
+  L429: raise ValueError(f"WEAT JSON missing keys: {missing}")
+  L430: return WeatSets(
+  L441: def compute_direct_bias(
+  L447: project_fn = resolve_callable(DIRECT_BIAS_FN)
+  L461: return direct_bias_standalone(vocab, X, gender_direction, target_words)
+  L464: def compute_weat(vocab: list[str], X: np.ndarray, weat_sets: WeatSets) -> float:
+  L465: project_fn = resolve_callable(WEAT_FN)
+  L471: kwargs[name] = weat_sets.X
+  L475: kwargs[name] = weat_sets.Y
+  L479: kwargs[name] = weat_sets.A
+  L483: kwargs[name] = weat_sets.B
+  L487: return weat_effect_size_standalone(vocab, X, weat_sets)
+  L498: axes[0].plot(df["pc"], df["direct_bias"], marker="o", label="Direct Bias")
+  L499: axes[0].plot(df["pc"], df["weat"], marker="o", label="WEAT")
+  L505: axes[1].plot(df["pc"], df["mean_displacement"], marker="o", label="Mean displacement")
+  L506: axes[1].plot(df["pc"], df["neighbor_stability_at_10"], marker="o", label="Neighbor stability@10")
+  L518: ax.plot(df["pc"], df["delta_direct_bias"], marker="o", label="Δ Direct Bias")
+  L519: ax.plot(df["pc"], df["delta_weat"], marker="o", label="Δ WEAT")
+  L520: ax.plot(df["pc"], df["delta_mean_displacement"], marker="o", label="Δ Mean displacement")
+  L521: ax.plot(df["pc"], df["delta_neighbor_stability"], marker="o", label="Δ Neighbor stability")
+  L525: ax.set_title("Single-PC ablation deltas relative to original embedding")
+  L541: direct_bias_words_json: str | None,
+  L542: weat_json: str | None,
+  L553: direct_bias_words = load_direct_bias_words(direct_bias_words_json)
+  L554: weat_sets = load_weat_sets(weat_json)
+  L556: # Baseline metrics on original embedding.
+  L558: baseline_direct_bias = compute_direct_bias(vocab, X0, baseline_gender_direction, direct_bias_words)
+  L559: baseline_weat = compute_weat(vocab, X0, weat_sets)
+  L560: baseline_mean_displacement = 0.0
+  L568: direct_bias = compute_direct_bias(vocab, Xp, baseline_gender_direction, direct_bias_words)
+  L569: weat = compute_weat(vocab, Xp, weat_sets)
+  L570: disp = mean_displacement(X0, Xp)
+  L582: "direct_bias": direct_bias,
+  L583: "weat": weat,
+  L584: "mean_displacement": disp,
+  L586: "delta_direct_bias": direct_bias - baseline_direct_bias,
+  L587: "delta_weat": weat - baseline_weat,
+  L588: "delta_mean_displacement": disp - baseline_mean_displacement,
+  L593: f"PC{pc:02d} | direct_bias={direct_bias:.6f} | weat={weat:.6f} | "
+  L594: f"mean_disp={disp:.6f} | neighbor_stability@10={stab:.6f}"
+  L601: print("\nBaseline metrics on original embedding")
+  L602: print(f"  direct_bias:            {baseline_direct_bias:.6f}")
+  L603: print(f"  weat:                   {baseline_weat:.6f}")
+  L604: print(f"  mean_displacement:      {baseline_mean_displacement:.6f}")
+  L605: print(f"  neighbor_stability@10:  {baseline_neighbor_stability:.6f}")
+  L608: best_db = df.loc[df["delta_direct_bias"].idxmin()]
+  L609: best_weat = df.loc[df["delta_weat"].idxmin()]
+  L610: biggest_shift = df.loc[df["mean_displacement"].idxmax()]
+  L613: print(f"  Biggest Direct Bias reduction: PC{int(best_db['pc'])} (Δ={best_db['delta_direct_bias']:.6f})")
+  L614: print(f"  Biggest WEAT reduction:        PC{int(best_weat['pc'])} (Δ={best_weat['delta_weat']:.6f})")
+  L615: print(f"  Biggest geometry shift:        PC{int(biggest_shift['pc'])} (mean displacement={biggest_shift['mean_displacement']:.6f})")
+  L624: parser = argparse.ArgumentParser(description="Run single-PC ablation on gender subspace PCs.")
+  L635: parser.add_argument("--weat-json", type=str, default=None)
+  L659: direct_bias_words_json=args.direct_bias_words_json,
+  L660: weat_json=args.weat_json,

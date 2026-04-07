@@ -1,0 +1,6 @@
+{
+  "X": ["science", "technology", "physics", "chemistry", "einstein", "nasa"],
+  "Y": ["poetry", "art", "dance", "literature", "novel", "symphony"],
+  "A": ["man", "male", "he", "him", "boy", "brother"],
+  "B": ["woman", "female", "she", "her", "girl", "sister"]
+}
