@@ -244,5 +244,5 @@ research_env/
 glove*.txt
 *.npy
 outputs/
-tchifou-experiments/data/
+tchifou-experiments/data/input/
 .vscode/

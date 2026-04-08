@@ -128,18 +128,21 @@ def calculate_weat_score(embeddings, model, target_A, target_B, attr_X, attr_Y):
 model = load_model()
 sem_pairs = load_wordsim353()
 
-gender_pairs = [('woman', 'man'), ('girl', 'boy'), ('she', 'he'), ('mother', 'father'), ('queen', 'king')]
+gender_pairs = [('he', 'she'), ('man', 'woman'), ('male', 'female'), ('boy', 'girl'), ('father', 'mother'), ('son', 'daughter'), 
+                ('brother', 'sister'), ('king', 'queen'), ('husband', 'wife'), ('actor', 'actress'), ('uncle', 'aunt'), 
+                ('gentleman', 'lady'), ('grandfather', 'grandmother'), ('prince', 'princess'), ('monk', 'nun')]
 gender_components = get_gender_subspace(model, gender_pairs)
 gender_dir = gender_components[0]
 
-neutral_words = ['nurse', 'doctor', 'engineer', 'teacher', 'receptionist', 'programmer', 'lawyer', 'scientist']
+neutral_words = ['doctor', 'nurse', 'engineer', 'teacher', 'scientist', 'programmer', 'manager',	'lawyer', 'mathematician', 'homemaker',	'receptionist', 'librarian', 
+                 'surgeon', 'chef', 'journalist', 'architect', 'accountant', 'designer', 'assistant', 'boss']
 neutral_idx = [model.key_to_index[w] for w in neutral_words if w in model.key_to_index]
 
 # WEAT Sets (Career vs Family)
-t_career = ['executive', 'management', 'professional', 'corporation', 'salary']
-t_family = ['home', 'parents', 'children', 'wedding', 'relatives']
-a_male = ['john', 'male', 'man', 'boy', 'brother']
-a_female = ['amy', 'female', 'woman', 'girl', 'sister']
+X= ['science', 'technology', 'physics', 'chemistry', 'einstein', 'nasa']
+Y= ['poetry', 'art', 'dance', 'literature', 'novel', 'symphony']
+A= ['man', 'male', 'he', 'him', 'boy', 'brother']
+B= ['woman', 'female', 'she', 'her', 'girl', 'sister']
 
 original_vectors = model.get_normed_vectors()
 results = []
@@ -151,7 +154,7 @@ for n in range(11):
     
     db = calculate_direct_bias(debiased_vectors, neutral_idx, gender_dir)
     mvd = calculate_mvd(original_vectors, debiased_vectors)
-    weat = calculate_weat_score(debiased_vectors, model, t_career, t_family, a_male, a_female)
+    weat = calculate_weat_score(debiased_vectors, model, X, Y, A, B)
     sem_geo = evaluate_semantic_geometry(debiased_vectors, model, sem_pairs)
     
     results.append({
