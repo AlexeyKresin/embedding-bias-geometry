@@ -1,0 +1,172 @@
+import numpy as np
+import pandas as pd
+import os
+import io
+import requests
+from sklearn.decomposition import PCA
+from gensim.models import KeyedVectors
+import gensim.downloader as api
+from scipy.stats import spearmanr
+
+# --- 1. PATH CONFIGURATION ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+INPUT_DIR = os.path.join(DATA_DIR, 'input')
+OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
+
+# Ensure directories exist
+for folder in [INPUT_DIR, OUTPUT_DIR]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+# File Paths
+MODEL_FILENAME = os.path.join(INPUT_DIR, 'GoogleNews-vectors-negative300.bin')
+WORDSIM_FILENAME = os.path.join(INPUT_DIR, 'wordsim353_combined.csv')
+OUTPUT_CSV = os.path.join(OUTPUT_DIR, 'debiasing_metrics_results.csv')
+
+def load_model():
+    """Loads the Word2Vec model from the data/input folder."""
+    if os.path.exists(MODEL_FILENAME):
+        print(f"Loading local model from {MODEL_FILENAME}...")
+        return KeyedVectors.load_word2vec_format(MODEL_FILENAME, binary=True)
+    else:
+        print(f"Model not found in {INPUT_DIR}. Downloading to input folder...")
+        model = api.load('word2vec-google-news-300')
+        model.save_word2vec_format(MODEL_FILENAME, binary=True)
+        return model
+
+def load_wordsim353():
+    """Loads WordSim-353 and saves it to the data/input folder."""
+    if os.path.exists(WORDSIM_FILENAME):
+        print(f"Loading WordSim-353 from: {WORDSIM_FILENAME}")
+        df = pd.read_csv(WORDSIM_FILENAME)
+    else:
+        url = "https://raw.githubusercontent.com/infofreund/wordsim353/master/combined.csv"
+        print("Downloading WordSim-353 to input folder...")
+        try:
+            response = requests.get(url)
+            df = pd.read_csv(io.StringIO(response.text))
+            df.to_csv(WORDSIM_FILENAME, index=False)
+        except Exception as e:
+            print(f"Error loading WordSim-353: {e}")
+            return []
+
+    pairs = []
+    for _, row in df.iterrows():
+        pairs.append(((str(row['Word 1']).lower(), str(row['Word 2']).lower()), row['Human (mean)']))
+    return pairs
+
+# --- 2. CORE LOGIC ---
+
+def get_gender_subspace(model, pairs):
+    """Identifies gender principal components."""
+    diff_vectors = []
+    for female, male in pairs:
+        if female in model and male in model:
+            diff_vectors.append(model[female] - model[male])
+    pca = PCA()
+    pca.fit(diff_vectors)
+    return pca.components_
+
+def remove_pc_projections(embeddings, pcs_to_remove):
+    """Progressive PCA removal."""
+    debiased_embeddings = embeddings.copy()
+    for v in pcs_to_remove:
+        v = v / np.linalg.norm(v) 
+        projections = np.outer(debiased_embeddings @ v, v)
+        debiased_embeddings -= projections
+    
+    norms = np.linalg.norm(debiased_embeddings, axis=1, keepdims=True)
+    norms[norms == 0] = 1 
+    return debiased_embeddings / norms
+
+# --- 3. KPI FUNCTIONS ---
+
+def calculate_direct_bias(embeddings, word_indices, gender_direction):
+    """Measures explicit bias projection."""
+    neutral_vectors = embeddings[word_indices]
+    cos_sims = neutral_vectors @ gender_direction
+    return np.mean(np.abs(cos_sims))
+
+def calculate_mvd(original_embeddings, debiased_embeddings):
+    """Measures mean vector displacement."""
+    distances = np.linalg.norm(original_embeddings - debiased_embeddings, axis=1)
+    return np.mean(distances)
+
+def evaluate_semantic_geometry(debiased_vectors, model, eval_pairs):
+    """Calculates Spearman correlation for Semantic Geometry."""
+    sims = []
+    gold_standard = []
+    for (w1, w2), score in eval_pairs:
+        if w1 in model and w2 in model:
+            idx1, idx2 = model.key_to_index[w1], model.key_to_index[w2]
+            sims.append(np.dot(debiased_vectors[idx1], debiased_vectors[idx2]))
+            gold_standard.append(score)
+    if len(sims) < 2: return 0.0
+    return spearmanr(sims, gold_standard).correlation
+
+def calculate_weat_score(embeddings, model, target_A, target_B, attr_X, attr_Y):
+    """Calculates WEAT effect size."""
+    def s_w(w_idx, X_idx, Y_idx):
+        mean_X = np.mean([np.dot(embeddings[w_idx], embeddings[x]) for x in X_idx])
+        mean_Y = np.mean([np.dot(embeddings[w_idx], embeddings[y]) for y in Y_idx])
+        return mean_X - mean_Y
+
+    A_idx = [model.key_to_index[w] for w in target_A if w in model]
+    B_idx = [model.key_to_index[w] for w in target_B if w in model]
+    X_idx = [model.key_to_index[w] for w in attr_X if w in model]
+    Y_idx = [model.key_to_index[w] for w in attr_Y if w in model]
+
+    if not (A_idx and B_idx and X_idx and Y_idx): return 0.0
+
+    scores_A = [s_w(a, X_idx, Y_idx) for a in A_idx]
+    scores_B = [s_w(b, X_idx, Y_idx) for b in B_idx]
+    return (np.mean(scores_A) - np.mean(scores_B)) / np.std(scores_A + scores_B)
+
+# --- 4. EXECUTION ---
+
+model = load_model()
+sem_pairs = load_wordsim353()
+
+gender_pairs = [('woman', 'man'), ('girl', 'boy'), ('she', 'he'), ('mother', 'father'), ('queen', 'king')]
+gender_components = get_gender_subspace(model, gender_pairs)
+gender_dir = gender_components[0]
+
+neutral_words = ['nurse', 'doctor', 'engineer', 'teacher', 'receptionist', 'programmer', 'lawyer', 'scientist']
+neutral_idx = [model.key_to_index[w] for w in neutral_words if w in model.key_to_index]
+
+# WEAT Sets (Career vs Family)
+t_career = ['executive', 'management', 'professional', 'corporation', 'salary']
+t_family = ['home', 'parents', 'children', 'wedding', 'relatives']
+a_male = ['john', 'male', 'man', 'boy', 'brother']
+a_female = ['amy', 'female', 'woman', 'girl', 'sister']
+
+original_vectors = model.get_normed_vectors()
+results = []
+
+print("\nStarting Progressive PCA Removal Analysis...")
+for n in range(11):
+    current_pcs = gender_components[:n]
+    debiased_vectors = remove_pc_projections(original_vectors, current_pcs)
+    
+    db = calculate_direct_bias(debiased_vectors, neutral_idx, gender_dir)
+    mvd = calculate_mvd(original_vectors, debiased_vectors)
+    weat = calculate_weat_score(debiased_vectors, model, t_career, t_family, a_male, a_female)
+    sem_geo = evaluate_semantic_geometry(debiased_vectors, model, sem_pairs)
+    
+    results.append({
+        'pcs_removed': n,
+        'direct_bias': db,
+        'mvd': mvd,
+        'weat_score': weat,
+        'semantic_geometry': sem_geo
+    })
+    print(f"PCs Removed: {n:2} | DB: {db:.4f} | MVD: {mvd:.4f} | WEAT: {weat:.4f} | Sem: {sem_geo:.4f}")
+
+# --- 5. EXPORT ---
+df_results = pd.DataFrame(results)
+df_results.to_csv(OUTPUT_CSV, index=False)
+
+print("\n--- Analysis Complete ---")
+print(f"Input model used from: {INPUT_DIR}")
+print(f"Results and datasets saved in: {OUTPUT_DIR}")
