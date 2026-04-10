@@ -14,25 +14,27 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 INPUT_DIR = os.path.join(DATA_DIR, 'input')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 
-# Ensure directories exist
 for folder in [INPUT_DIR, OUTPUT_DIR]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-# File Paths
-MODEL_FILENAME = os.path.join(INPUT_DIR, 'GoogleNews-vectors-negative300.bin')
+# File Paths - Updated for FastText
+MODEL_FILENAME = os.path.join(INPUT_DIR, 'fasttext-wiki-news-300.bin')
 WORDSIM_FILENAME = os.path.join(INPUT_DIR, 'wordsim353_combined.csv')
-OUTPUT_CSV = os.path.join(OUTPUT_DIR, 'word2vec_debiasing_metrics_results.csv')
+OUTPUT_CSV = os.path.join(OUTPUT_DIR, 'fasttext_debiasing_results.csv')
 
 def load_model():
-    """Loads the Word2Vec model from the data/input folder."""
+    """Loads the FastText model from input folder or downloads it."""
     if os.path.exists(MODEL_FILENAME):
-        print(f"Loading local model from {MODEL_FILENAME}...")
-        return KeyedVectors.load_word2vec_format(MODEL_FILENAME, binary=True)
+        print(f"Loading local FastText model from {MODEL_FILENAME}...")
+        # Note: use load_facebook_vectors for .bin or load_word2vec_format for .vec
+        return KeyedVectors.load_word2vec_format(MODEL_FILENAME, binary=False)
     else:
-        print(f"Model not found in {INPUT_DIR}. Downloading to input folder...")
-        model = api.load('word2vec-google-news-300')
-        model.save_word2vec_format(MODEL_FILENAME, binary=True)
+        print(f"Model not found in {INPUT_DIR}. Downloading FastText (Wiki News)...")
+        # 'fasttext-wiki-news-subwords-300' is a standard high-quality option
+        model = api.load('fasttext-wiki-news-subwords-300')
+        print(f"Saving model to {MODEL_FILENAME}...")
+        model.save_word2vec_format(MODEL_FILENAME, binary=False)
         return model
 
 def load_wordsim353():
@@ -56,10 +58,9 @@ def load_wordsim353():
         pairs.append(((str(row['Word 1']).lower(), str(row['Word 2']).lower()), row['Human (mean)']))
     return pairs
 
-# --- 2. CORE LOGIC ---
+# --- 2. CORE LOGIC (Remains mathematically identical for FastText) ---
 
 def get_gender_subspace(model, pairs):
-    """Identifies gender principal components."""
     diff_vectors = []
     for female, male in pairs:
         if female in model and male in model:
@@ -69,7 +70,6 @@ def get_gender_subspace(model, pairs):
     return pca.components_
 
 def remove_pc_projections(embeddings, pcs_to_remove):
-    """Progressive PCA removal."""
     debiased_embeddings = embeddings.copy()
     for v in pcs_to_remove:
         v = v / np.linalg.norm(v) 
@@ -80,21 +80,18 @@ def remove_pc_projections(embeddings, pcs_to_remove):
     norms[norms == 0] = 1 
     return debiased_embeddings / norms
 
-# --- 3. KPI FUNCTIONS ---
+# --- 3. KPI FUNCTIONS (Compatible with any unit-norm vectors) ---
 
 def calculate_direct_bias(embeddings, word_indices, gender_direction):
-    """Measures explicit bias projection."""
     neutral_vectors = embeddings[word_indices]
     cos_sims = neutral_vectors @ gender_direction
     return np.mean(np.abs(cos_sims))
 
 def calculate_mvd(original_embeddings, debiased_embeddings):
-    """Measures mean vector displacement."""
     distances = np.linalg.norm(original_embeddings - debiased_embeddings, axis=1)
     return np.mean(distances)
 
 def evaluate_semantic_geometry(debiased_vectors, model, eval_pairs):
-    """Calculates Spearman correlation for Semantic Geometry."""
     sims = []
     gold_standard = []
     for (w1, w2), score in eval_pairs:
@@ -106,7 +103,6 @@ def evaluate_semantic_geometry(debiased_vectors, model, eval_pairs):
     return spearmanr(sims, gold_standard).correlation
 
 def calculate_weat_score(embeddings, model, target_A, target_B, attr_X, attr_Y):
-    """Calculates WEAT effect size."""
     def s_w(w_idx, X_idx, Y_idx):
         mean_X = np.mean([np.dot(embeddings[w_idx], embeddings[x]) for x in X_idx])
         mean_Y = np.mean([np.dot(embeddings[w_idx], embeddings[y]) for y in Y_idx])
@@ -134,20 +130,21 @@ gender_pairs = [('he', 'she'), ('man', 'woman'), ('male', 'female'), ('boy', 'gi
 gender_components = get_gender_subspace(model, gender_pairs)
 gender_dir = gender_components[0]
 
-neutral_words = ['doctor', 'nurse', 'engineer', 'teacher', 'scientist', 'programmer', 'manager',	'lawyer', 'mathematician', 'homemaker',	'receptionist', 'librarian', 
+neutral_words = ['doctor', 'nurse', 'engineer', 'teacher', 'scientist', 'programmer', 'manager', 'lawyer', 'mathematician', 'homemaker', 'receptionist', 'librarian', 
                  'surgeon', 'chef', 'journalist', 'architect', 'accountant', 'designer', 'assistant', 'boss']
 neutral_idx = [model.key_to_index[w] for w in neutral_words if w in model.key_to_index]
 
-# WEAT Sets (Career vs Family)
+# WEAT Sets (Science vs Art mapped to Male/Female attributes)
 X= ['science', 'technology', 'physics', 'chemistry', 'einstein', 'nasa']
 Y= ['poetry', 'art', 'dance', 'literature', 'novel', 'symphony']
 A= ['man', 'male', 'he', 'him', 'boy', 'brother']
 B= ['woman', 'female', 'she', 'her', 'girl', 'sister']
 
+# FastText models from api.load often come pre-normalized, but we ensure it here
 original_vectors = model.get_normed_vectors()
 results = []
 
-print("\nStarting Progressive PCA Removal Analysis...")
+print("\nStarting Progressive PCA Removal Analysis on FastText...")
 for n in range(11):
     current_pcs = gender_components[:n]
     debiased_vectors = remove_pc_projections(original_vectors, current_pcs)
@@ -171,5 +168,4 @@ df_results = pd.DataFrame(results)
 df_results.to_csv(OUTPUT_CSV, index=False)
 
 print("\n--- Analysis Complete ---")
-print(f"Input model used from: {INPUT_DIR}")
-print(f"Results and datasets saved in: {OUTPUT_DIR}")
+print(f"FastText Results saved in: {OUTPUT_DIR}")

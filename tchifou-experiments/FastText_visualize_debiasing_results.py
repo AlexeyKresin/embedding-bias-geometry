@@ -6,9 +6,9 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
-INPUT_CSV = os.path.join(OUTPUT_DIR, 'debiasing_metrics_results.csv')
-PLOT_OUTPUT_DASHBOARD = os.path.join(OUTPUT_DIR, 'word2vec_debiasing_dashboard.png')
-PLOT_OUTPUT_COMBINED = os.path.join(OUTPUT_DIR, 'word2vec_normalized_comparison_plot.png')
+INPUT_CSV = os.path.join(OUTPUT_DIR, 'fasttext_debiasing_results.csv')
+PLOT_OUTPUT_DASHBOARD = os.path.join(OUTPUT_DIR, 'fasttext_debiasing_dashboard.png')
+PLOT_OUTPUT_COMBINED = os.path.join(OUTPUT_DIR, 'fasttext_normalized_comparison_plot.png')
 
 def min_max_normalize(series):
     """Scales a series to a range between 0 and 1."""
