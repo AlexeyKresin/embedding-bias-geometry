@@ -246,3 +246,13 @@ glove*.txt
 outputs/
 tchifou-experiments/data/input/
 .vscode/
+
+
+# Large embedding files
+data/*.bin
+data/*.vec
+data/*.gz
+
+# Optional: ignore ALL raw embeddings
+# data/*
+# !data/*.json   # keep configs tracked
